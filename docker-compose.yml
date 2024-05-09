@@ -1,0 +1,145 @@
+x-common-server: &common-server
+  env_file:
+    - ./app/.env.common
+
+volumes:
+  mariadb: { }
+  pgadmin: { }
+
+services:
+  traefik:
+    image: traefik:v3.0
+    command:
+      - --log.level=DEBUG
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.http.address=:80
+      - --ping=true
+      - --api
+    ports:
+      - published: 80
+        target: 80
+        mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      traefik: { }
+    deploy: &labels
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik
+        - traefik.constraint-label=traefik
+        - traefik.http.routers.api.service=api@internal
+        - traefik.http.services.dummy-svc.loadbalancer.server.port=9000
+        # HTTP
+        - traefik.http.routers.api.rule=Host(`traefik.${BASE_DOMAIN?}`)
+    <<: *labels
+
+  api-vendor-installer:
+    build:
+      context: ./utils/composer
+    volumes:
+      - ./app:/app
+    <<: *common-server
+
+  api-server:
+    build:
+      target: server-develop
+      dockerfile: ./app/Dockerfile
+    volumes:
+      - ./app:/app
+    ports:
+      - 8080:8000
+    networks:
+      traefik: { }
+      default: { }
+    depends_on:
+      api-migrator:
+        condition: service_completed_successfully
+      traefik:
+        condition: service_started
+    deploy:
+      labels: &labels
+        - traefik.enable=true
+        - traefik.docker.network=traefik
+        - traefik.constraint-label=traefik
+        - traefik.http.routers.${COMPOSE_PROJECT_NAME?}-account-server.rule=Host(`${API_SERVER_HOST?}`) && PathPrefix(`${API_SERVER_PATH_PREFIX?}`)
+        - traefik.http.services.${COMPOSE_PROJECT_NAME?}-account-server.loadbalancer.server.port=8000
+    labels: *labels
+    <<: *common-server
+
+  api-database:
+    image: mariadb
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized" ]
+      start_period: 10s
+      start_interval: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    environment:
+      MYSQL_ROOT_PASSWORD: ${API_DATABASE_PASSWORD?}
+      MYSQL_DATABASE: ${API_DATABASE_NAME:-api}
+      MYSQL_USER: ${API_DATABASE_USER:-user}
+      MYSQL_PASSWORD: ${API_DATABASE_PASSWORD?}
+    volumes:
+      - mariadb:/var/lib/mysql
+
+  api-phpcs:
+    build:
+      target: cli
+      dockerfile: ./app/Dockerfile
+    volumes:
+      - ./app:/app
+      - ./utils/test/phpcs:/phpcs
+    command: php ./vendor/bin/phpcs --standard=/phpcs/standart.xml --report=full --report-xml=".phpcs.results.xml" .
+    profiles:
+      - donotstart
+    <<: *common-server
+
+  api-phpcbf:
+    build:
+      target: cli
+      dockerfile: ./app/Dockerfile
+    volumes:
+      - ./app:/app
+      - ./utils/test/phpcs:/phpcs
+    command: php ./vendor/bin/phpcbf --standard=/phpcs/standart.xml .
+    profiles:
+      - donotstart
+    <<: *common-server
+
+  adminer:
+    image: adminer
+    networks:
+      traefik: { }
+      default: { }
+    depends_on:
+      api-database:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+      - traefik.constraint-label=traefik
+      # http
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME?}-adminer.rule=Host(`${ADMINER_HOST?}`)
+      - traefik.http.services.${COMPOSE_PROJECT_NAME?}-adminer.loadbalancer.server.port=8080
+    restart: unless-stopped
+
+  api-migrator:
+    build:
+      target: cli-develop
+      dockerfile: ./app/Dockerfile
+    volumes:
+      - ./app:/app
+    depends_on:
+      api-database:
+        condition: service_healthy
+    restart: on-failure
+    <<: *common-server
+    command: migrate --seed
+
+networks:
+  traefik:
+    name: traefik
