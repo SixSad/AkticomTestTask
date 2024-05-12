@@ -45,7 +45,7 @@ services:
   api-server:
     build:
       target: server-develop
-      dockerfile: ./app/Dockerfile
+      dockerfile: utils/stabs/Dockerfile
     volumes:
       - ./app:/app
     ports:
@@ -89,7 +89,7 @@ services:
   api-phpcs:
     build:
       target: cli
-      dockerfile: ./app/Dockerfile
+      dockerfile: utils/stabs/Dockerfile
     volumes:
       - ./app:/app
       - ./utils/test/phpcs:/phpcs
@@ -101,7 +101,7 @@ services:
   api-phpcbf:
     build:
       target: cli
-      dockerfile: ./app/Dockerfile
+      dockerfile: utils/stabs/Dockerfile
     volumes:
       - ./app:/app
       - ./utils/test/phpcs:/phpcs
@@ -130,15 +130,15 @@ services:
   api-migrator:
     build:
       target: cli-develop
-      dockerfile: ./app/Dockerfile
+      dockerfile: utils/stabs/Dockerfile
     volumes:
       - ./app:/app
     depends_on:
       api-database:
         condition: service_healthy
-    restart: on-failure
+    restart: on-failure:3
     <<: *common-server
-    command: migrate --seed
+    command: migrate
 
 networks:
   traefik:

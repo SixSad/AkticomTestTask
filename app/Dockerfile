@@ -81,7 +81,7 @@ CMD php artisan octane:start --host=0.0.0.0 --watch
 
 
 FROM base-server as server
-COPY .. .
+COPY ../.. .
 COPY --from=vendor ${ROOT}/vendor vendor
 CMD php artisan octane:start --host=0.0.0.0
 
@@ -92,8 +92,6 @@ RUN apt-get clean; \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*; \
     rm /var/log/lastlog /var/log/faillog
 COPY /app .
-#COPY --from=vendor ${ROOT}/vendor vendor
-#ENTRYPOINT ["php", "artisan"]
 
 
 FROM base as cli-develop
