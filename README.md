@@ -21,3 +21,11 @@ docker-compose run api-phpcbf
 ## Доступные консоли инструментов:
  - traefik [http://traefik.localhost]
  - adminer [http://adminer.localhost]
+   
+## Доступные routes
+ - / - healthchek for api
+ - GET /loans - получение всех записей 
+ - GET /loans/{$id} - получение конкретной записи
+ - POST /loans - создание записи
+ - DELETE /loans/{$id} - даление записи
+ - PUT /loans/{$id} - обновление записи
