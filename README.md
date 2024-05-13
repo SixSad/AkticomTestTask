@@ -29,3 +29,9 @@ docker-compose run api-phpcbf
  - POST /loans - создание записи
  - DELETE /loans/{$id} - даление записи
  - PUT /loans/{$id} - обновление записи
+ - POST /loans/search - для фильтрации записей пример запроса 
+```
+    "sort" : [
+        {"field" : "sum", "direction" : "asc"},
+    ],
+```
